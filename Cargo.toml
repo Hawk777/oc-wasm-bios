@@ -1,0 +1,32 @@
+[package]
+name = "oc-wasm-bios"
+version = "0.1.0"
+authors = ["Christopher Head <chead@chead.ca>"]
+edition = "2018"
+description = "A BIOS for the OC-Wasm OpenComputers architecture"
+repository = "https://gitlab.com/Hawk777/oc-wasm-bios"
+license = "GPL-3.0-only"
+keywords = ["minecraft", "oc-wasm", "opencomputers"]
+categories = ["games"]
+resolver = "2"
+
+[dependencies.oc-wasm-safe]
+default-features = false
+features = []
+version = "^0.1"
+
+[dependencies.oc-wasm-sys]
+default-features = false
+features = []
+version = "^0.1"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"

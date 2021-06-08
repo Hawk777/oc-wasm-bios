@@ -1,0 +1,350 @@
+#!/usr/bin/env python3
+
+import argparse
+import pathlib
+import struct
+
+
+LE_WORD = struct.Struct("<I")
+
+
+def decode_uleb128(data):
+    """
+    Decode an unsigned LEB128 integer.
+
+    Return a (value, rest) pair, where rest is the remaining bytes in data.
+    """
+    value = 0
+    shift = 0
+    while True:
+        byte = data[0]
+        data = data[1:]
+        value = value | ((byte & 0x7F) << shift)
+        shift += 7
+        if not (byte & 0x80):
+            break
+    return (value, data)
+
+
+def decode_sleb128(data):
+    """
+    Decode a signed LEB128 integer.
+
+    Return a (value, rest) pair, where rest is the remaining bytes in data.
+    """
+    value = 0
+    shift = 0
+    while True:
+        byte = data[0]
+        data = data[1:]
+        value = value | ((byte & 0x7F) << shift)
+        shift += 7
+        if not (byte & 0x80):
+            break
+    if value & (1 << (shift - 1)):
+        value = value | (~0 << shift)
+    return value, data
+
+
+def encode_uleb128(value):
+    """Encode an unsigned LEB128 integer."""
+    assert value >= 0, "Cannot ULEB128-encode a negative value"
+    ret = b""
+    while True:
+        byte = value & 0x7F
+        value = value >> 7
+        if value:
+            byte = byte | 0x80
+        ret += bytes((byte,))
+        if not value:
+            break
+    return ret
+
+
+def encode_sleb128(value):
+    """Encode a signed LEB128 integer."""
+    ret = b""
+    while True:
+        byte = value & 0x7F
+        value = value >> 7
+        if value >= 0:
+            more = value != 0 or byte & 0x40
+        else:
+            more = value != -1 or not (byte & 0x40)
+        if more:
+            byte = byte | 0x80
+        ret += bytes((byte,))
+        if not more:
+            break
+    return ret
+
+
+class Global:
+    """A global variable."""
+
+    __slots__ = (
+        "type",
+        "mut",
+        "init",
+    )
+
+    def __init__(self, type, mut, init):
+        """Initialize the Global from its parts."""
+        super().__init__()
+        self.type = type
+        self.mut = mut
+        self.init = init
+
+    def encode(self):
+        """Convert the object into its binary form."""
+        return bytes((self.type,)) + (b"\x01" if self.mut else b"\x00") + b"\x41" + encode_sleb128(self.init) + b"\x0B"
+
+    @staticmethod
+    def decode(data):
+        """
+        Initialize the Global from a sequence of bytes.
+
+        Return a (global, rest) pair, where rest is the remaining bytes in data.
+        """
+        type = data[0]
+        data = data[1:]
+        assert type == 0x7F, f"Only globals of type i32 are supported but got {type}"
+        mut = data[0]
+        data = data[1:]
+        assert mut in (0, 1), f"Wasm global mut value must be 0 or 1 but is {mut}"
+        mut = mut != 0
+        assert data[0] == 0x41, f"Expected i32.const global init value but got {data[0]}"
+        data = data[1:]
+        init, data = decode_sleb128(data)
+        assert data[0] == 0x0B, f"Expected end in offset expr but got {data[0]}"
+        data = data[1:]
+        return Global(type, mut, init), data
+
+
+class DataSegment:
+    """A data segment."""
+
+    __slots__ = (
+        "data",
+        "offset",
+        "init",
+    )
+
+    def __init__(self, data, offset, init):
+        """Initialize the DataSegment from its parts."""
+        super().__init__()
+        self.data = data
+        self.offset = offset
+        self.init = init
+
+    def encode(self):
+        """Convert the object into its binary form."""
+        return encode_uleb128(self.data) + b"\x41" + encode_uleb128(self.offset) + b"\x0B" + encode_uleb128(len(self.init)) + self.init
+
+    @staticmethod
+    def decode(data):
+        """
+        Initialize the DataSegment from a sequence of bytes.
+
+        Return a (segment, rest) pair, where rest is the remaining bytes in data.
+        """
+        memidx, data = decode_uleb128(data)
+        assert data[0] == 0x41, f"Expected i32.const offset but got {data[0]}"
+        data = data[1:]
+        offset, data = decode_uleb128(data)
+        assert data[0] == 0x0B, f"Expected end in offset expr but got {data[0]}"
+        data = data[1:]
+        init_len, data = decode_uleb128(data)
+        init = data[:init_len]
+        data = data[init_len:]
+        return DataSegment(memidx, offset, init), data
+
+
+class WasmFile:
+    """A WebAssembly binary."""
+
+    __slots__ = (
+        "standard_sections",
+        "custom_sections",
+    )
+
+    def __init__(self, data):
+        """Initialize the binary from a sequence of bytes."""
+        super().__init__()
+
+        # Check magic number.
+        assert data.startswith(b"\x00\x61\x73\x6D"), "Bad Wasm magic number"
+        data = data[4:]
+
+        # Check version.
+        version = LE_WORD.unpack_from(data)[0]
+        assert version == 1, f"Wasm version {version} is not supported"
+        data = data[4:]
+
+        # Unpack sections.
+        self.standard_sections = {}
+        self.custom_sections = []
+        while data:
+            section_id = data[0]
+            data = data[1:]
+            section_size, data = decode_uleb128(data)
+            section_data = data[:section_size]
+            data = data[section_size:]
+            if section_id:
+                assert section_id not in self.standard_sections, f"Duplicate section ID {section_id}"
+                self.standard_sections[section_id] = section_data
+            else:
+                self.custom_sections.append(section_data)
+
+        # Decode sections whose encoding is known.
+        data_section = self.standard_sections.get(11)
+        if data_section is not None:
+            count, data_section = decode_uleb128(data_section)
+            segments = []
+            while data_section:
+                segment, data_section = DataSegment.decode(data_section)
+                segments.append(segment)
+            assert len(segments) == count, f"Expected {count} data segments but got {len(segments)}"
+            self.standard_sections[11] = segments
+        globals_section = self.standard_sections.get(6)
+        if globals_section is not None:
+            count, globals_section = decode_uleb128(globals_section)
+            globals = []
+            while globals_section:
+                g, globals_section = Global.decode(globals_section)
+                globals.append(g)
+            assert len(globals) == count, f"Expected {count} globals but got {len(globals)}"
+            self.standard_sections[6] = globals
+
+    def encode(self):
+        """Convert the object into a WebAssembly binary."""
+        ret = b"\x00\x61\x73\x6D\x01\x00\x00\x00"
+        for section_id in sorted(self.standard_sections):
+            section_data = WasmFile.__encode_section_or_part(self.standard_sections[section_id])
+            ret += bytes((section_id,))
+            ret += encode_uleb128(len(section_data))
+            ret += section_data
+        for section_data in self.custom_sections:
+            ret += b"\x00"
+            ret += encode_uleb128(len(section_data))
+            ret += section_data
+        return ret
+
+    @staticmethod
+    def __encode_section_or_part(value):
+        """Convert a section or part of a section into binary form."""
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, list):
+            return encode_uleb128(len(value)) + b"".join(WasmFile.__encode_section_or_part(i) for i in value)
+        else:
+            return value.encode()
+
+
+def remove_framing(data):
+    """
+    Remove the framing from an LZ4 file and returns the raw sequence stream.
+    """
+    # Check magic number.
+    assert data.startswith(b"\x04\x22\x4D\x18"), "Bad LZ4 magic number"
+    data = data[4:]
+
+    # Get flag byte.
+    flags = data[0]
+    data = data[1:]
+
+    # Only version 1 is supported.
+    version = flags >> 6
+    assert version == 1, f"LZ4 version {version} is not supported"
+
+    # External dictionaries are not supported.
+    assert not (flags & 0x01), "LZ4 external dictionaries are not supported"
+
+    # Reserved bits are not supported.
+    assert not (flags & 0x02), "LZ4 reserved bit is set"
+
+    # Get the BD byte.
+    bd = data[0]
+    data = data[1:]
+
+    # Reserved bits are not supported.
+    assert not (bd & 0x8F), "LZ4 reserved bit is set"
+
+    # Skip the content size, if present.
+    if flags & 0x08:
+        data = data[8:]
+
+    # Skip the header checksum byte.
+    data = data[1:]
+
+    # Accumulate the raw sequence stream.
+    out = b""
+    while True:
+        # Get the block size word.
+        block_size = LE_WORD.unpack_from(data)[0]
+        data = data[4:]
+
+        # Uncompressed blocks are not supported.
+        assert not block_size & 0x80000000, "LZ4 uncompressed blocks are not supported"
+
+        # Check if it’s an end mark.
+        if not block_size:
+            break
+
+        # Add the data.
+        out += data[:block_size]
+        data = data[block_size:]
+
+        # Skip the block checksum, if present.
+        if flags & 0x10:
+            data = data[4:]
+
+    # Remove the content checksum, if present.
+    if flags & 0x04:
+        data = data[4:]
+
+    # There must not be any trailing data.
+    assert not data, "LZ4 file has data after end marker"
+
+    return out
+
+
+def main():
+    # Parse command-line parameters.
+    parser = argparse.ArgumentParser(description="Pack decompressor.wasm and an LZ4-compressed payload into a final .wasm binary")
+    parser.add_argument("--output", "-o", type=pathlib.Path, required=True, help="the packed .wasm file to write")
+    parser.add_argument("wasmfile", type=pathlib.Path, help="the decompressor.wasm to read")
+    parser.add_argument("lz4file", type=pathlib.Path, help="the LZ4-compressed payload file to read")
+    args = parser.parse_args()
+
+    # Load the decompressor.wasm file.
+    decompressor = WasmFile(args.wasmfile.read_bytes())
+
+    # Load the LZ4 source file and remove the framing, leaving only the raw
+    # sequence stream.
+    payload = remove_framing(args.lz4file.read_bytes())
+
+    # The payload must be ≤4096 bytes long.
+    assert len(payload) <= 4096, f"Payload is {len(payload)} bytes, but only up to 4096 are supported"
+
+    # Add a data segment with the payload.
+    data_section = decompressor.standard_sections.setdefault(11, [])
+    data_section.append(DataSegment(0, 0, payload))
+
+    # Find the global with initial value 0x55AA55AA and change it to the length
+    # of the payload.
+    globals_section = decompressor.standard_sections.setdefault(6, [])
+    length_global = None
+    for i in globals_section:
+        if i.type == 0x7F and not i.mut and i.init == 0x55AA55AA:
+            assert length_global is None, "Multiple globals have init value 0x55AA55AA"
+            length_global = i
+    assert length_global, "No globals have init value 0x55AA55AA"
+    length_global.init = len(payload)
+
+    # Write the output.
+    args.output.write_bytes(decompressor.encode())
+
+
+if __name__ == "__main__":
+    main()
