@@ -1,0 +1,25 @@
+"Lint":
+  stage: test
+  needs: []
+  image:
+    name: "rust"
+  script:
+    - rustup target add wasm32-unknown-unknown
+    - rustup component add clippy rustfmt
+    - cargo clippy
+    - cargo doc
+    - cargo fmt -- --check
+
+"Compile":
+  stage: build
+  needs: []
+  image:
+    name: "rust"
+  script:
+    - apt-get update
+    - apt-get install lz4 wabt
+    - rustup target add wasm32-unknown-unknown
+    - make
+  artifacts:
+    paths:
+      - packed.wasm
