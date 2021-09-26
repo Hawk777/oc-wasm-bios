@@ -546,7 +546,7 @@ fn run_step(state: State) -> error::Result<(RunResult, State)> {
 
 /// The application entry point.
 #[no_mangle]
-fn run(_: i32) -> i32 {
+pub extern "C" fn run(_: i32) -> i32 {
 	static mut STATE: State = State::Init;
 
 	// Run continuously until asked to return.
