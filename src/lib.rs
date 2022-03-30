@@ -38,9 +38,7 @@ use oc_wasm_sys::component as component_sys;
 #[panic_handler]
 fn handle_panic(_: &PanicInfo<'_>) -> ! {
 	// Do the absolute bare minimum to stop execution.
-	unsafe {
-		core::arch::wasm32::unreachable();
-	}
+	core::arch::wasm32::unreachable();
 }
 
 /// Reports an internal error with no more detailed message.
@@ -518,7 +516,7 @@ fn run_step(state: State) -> error::Result<(RunResult, State)> {
 					// SAFETY: we just checked that count ≤ rest.len()
 					// Cast from u64 to usize is sound because count ≤ rest.len().
 					#[allow(clippy::cast_possible_truncation)]
-					execute::add(&unsafe { rest.get_unchecked(0..count as usize) })?;
+					execute::add(unsafe { rest.get_unchecked(0..count as usize) })?;
 					let done = invoke_read(&info.uuid, info.descriptor.as_descriptor());
 					Ok((
 						if done {
