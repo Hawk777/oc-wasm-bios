@@ -13,12 +13,12 @@ resolver = "2"
 [dependencies.oc-wasm-safe]
 default-features = false
 features = []
-version = "^0.1"
+version = "^0.2"
 
 [dependencies.oc-wasm-sys]
 default-features = false
 features = []
-version = "^0.1"
+version = "^0.2"
 
 [lib]
 crate-type = ["cdylib"]
