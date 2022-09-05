@@ -12,7 +12,7 @@ categories = ["games"]
 [dependencies.oc-wasm-safe]
 default-features = false
 features = []
-version = "^0.2"
+version = "^0.3"
 
 [dependencies.oc-wasm-sys]
 default-features = false
