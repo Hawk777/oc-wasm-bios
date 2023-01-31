@@ -1,17 +1,14 @@
 (module
-	;; Types of imports.
-	(type $execute_add_type (func (param i32) (param i32) (result i32)))
-	(type $execute_execute_type (func))
-
-	;; Types of my functions.
-	(type $run_type (func (param i32) (result i32)))
-	(type $extend_length_type (func (param i32) (result i32)))
-	(type $read_8_type (func (result i32)))
-	(type $write_bytes_type (func (param i32) (param i32)))
+	;; Function types.
+	(type $void_type (func))
+	(type $void_i32_i32_type (func (param i32) (param i32)))
+	(type $i32_type (func (result i32)))
+	(type $i32_i32_type (func (param i32) (result i32)))
+	(type $i32_i32_i32_type (func (param i32) (param i32) (result i32)))
 
 	;; Imports.
-	(import "execute" "add" (func $execute_add (type $execute_add_type)))
-	(import "execute" "execute" (func $execute_execute (type $execute_execute_type)))
+	(import "execute" "add" (func $execute_add (type $i32_i32_i32_type)))
+	(import "execute" "execute" (func $execute_execute (type $void_type)))
 
 	;; The base address of the output region where the decompressed data will
 	;; be stored.
@@ -27,7 +24,7 @@
 
 	;; The application entry point.
 	(func $run
-		(type $run_type)
+		(type $i32_i32_type)
 		(param $indirect_call_completed i32)
 		(result i32)
 		(local $scratch i32)
@@ -106,7 +103,7 @@
 	;; Given the initial nybble of a length as a parameter, reads zero or more
 	;; additional bytes from $read_ptr to extend it, then returns the total length.
 	(func $extend_length
-		(type $extend_length_type)
+		(type $i32_i32_type)
 		(param $length i32)
 		(result i32)
 		(local $scratch i32)
@@ -128,7 +125,7 @@
 
 	;; Reads one byte from $read_ptr.
 	(func $read_8
-		(type $read_8_type)
+		(type $i32_type)
 		(result i32)
 		(global.get $read_ptr)
 		(i32.load8_u)
@@ -139,7 +136,7 @@
 
 	;; Copies $count bytes from $src to $write_ptr, advancing $write_ptr.
 	(func $write_bytes
-		(type $write_bytes_type)
+		(type $void_i32_i32_type)
 		(param $count i32)
 		(param $src i32)
 		;; Loop over the bytes.
