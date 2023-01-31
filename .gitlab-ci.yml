@@ -2,10 +2,8 @@
   stage: test
   needs: []
   image:
-    name: "rust"
+    name: registry.gitlab.com/hawk777/oc-wasm-ci-images/rust:ed2bd0679f7012ed3684a2787f053e2d230b16c9
   script:
-    - rustup target add wasm32-unknown-unknown
-    - rustup component add clippy rustfmt
     - cargo version
     - cargo clippy
     - cargo doc
@@ -15,11 +13,8 @@
   stage: build
   needs: []
   image:
-    name: "rust"
+    name: registry.gitlab.com/hawk777/oc-wasm-ci-images/rust:ed2bd0679f7012ed3684a2787f053e2d230b16c9
   script:
-    - apt-get update
-    - apt-get install lz4 wabt
-    - rustup target add wasm32-unknown-unknown
     - cargo version
     - make
   artifacts:
