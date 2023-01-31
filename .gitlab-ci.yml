@@ -6,6 +6,7 @@
   script:
     - rustup target add wasm32-unknown-unknown
     - rustup component add clippy rustfmt
+    - cargo version
     - cargo clippy
     - cargo doc
     - cargo fmt -- --check
@@ -19,6 +20,7 @@
     - apt-get update
     - apt-get install lz4 wabt
     - rustup target add wasm32-unknown-unknown
+    - cargo version
     - make
   artifacts:
     paths:
