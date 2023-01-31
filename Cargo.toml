@@ -19,9 +19,6 @@ default-features = false
 features = []
 version = "^0.2"
 
-[lib]
-crate-type = ["cdylib"]
-
 [profile.dev]
 panic = "abort"
 

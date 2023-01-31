@@ -7,11 +7,11 @@ TARGET_DIR := target/wasm32-unknown-unknown/release
 world : packed.wasm
 
 # Compile the BIOS into a .wasm file.
-$(TARGET_DIR)/oc_wasm_bios.wasm : src/lib.rs
+$(TARGET_DIR)/oc-wasm-bios.wasm : src/main.rs
 	cargo build --release
 
 # Strip debug symbols to save some space.
-build/stripped.wasm : $(TARGET_DIR)/oc_wasm_bios.wasm
+build/stripped.wasm : $(TARGET_DIR)/oc-wasm-bios.wasm
 	mkdir -p build
 	cp $< $@
 	wasm-strip $@

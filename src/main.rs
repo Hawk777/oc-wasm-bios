@@ -1,3 +1,4 @@
+#![no_main]
 #![no_std]
 #![warn(
 	// Turn on extra language lints.
