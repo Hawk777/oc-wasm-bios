@@ -27,8 +27,10 @@ downloading the file using an Internet card), and write the file to a writeable
 EEPROM. For example, if using OpenOS under the Lua architecture, one could use
 the `flash` program.
 
-The binary image can be obtained by downloading a precompiled image from a
-release or by compiling the BIOS yourself.
+The binary image can be obtained by downloading the artifacts from a recent
+[GitLab CI pipeline run](https://gitlab.com/Hawk777/oc-wasm-bios/-/pipelines)
+using the Download icon to the right-hand side of the page, or by compiling the
+BIOS yourself.
 
 
 Compiling
