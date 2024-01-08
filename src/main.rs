@@ -94,9 +94,9 @@ enum CborMajorType {
 /// at the next date item) are returned.
 ///
 /// # Errors
-/// * [`BufferTooShort`](error::BufferTooShort) is returned if `slice` is empty.
-/// * [`CborDecode`](error::CborDecode) is returned if `slice` is nonempty but does not contain a
-///   whole header, or if the header is invalid.
+/// * [`BufferTooShort`](error::Error::BufferTooShort) is returned if `slice` is empty.
+/// * [`CborDecode`](error::Error::CborDecode) is returned if `slice` is nonempty but does not
+///   contain a whole header, or if the header is invalid.
 fn cbor_decode_header(slice: &[u8]) -> error::Result<(CborMajorType, u64, &[u8])> {
 	// Grab the first byte.
 	let first_byte = slice.first().ok_or(error::Error::BufferTooShort)?;
