@@ -1,4 +1,4 @@
-TARGET_DIR := target/wasm32-unknown-unknown/release
+TARGET_DIR := $(shell ./get-target-dir)/wasm32-unknown-unknown/release
 
 .PHONY : world
 .DELETE_ON_ERROR :
