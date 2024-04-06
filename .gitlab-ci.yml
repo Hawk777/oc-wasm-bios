@@ -2,7 +2,7 @@
   stage: test
   needs: []
   image:
-    name: registry.gitlab.com/hawk777/oc-wasm-ci-images/rust:ed2bd0679f7012ed3684a2787f053e2d230b16c9
+    name: registry.gitlab.com/hawk777/oc-wasm-ci-images/rust:6b6902e3b5880ae33b65ed516e410dc3e846f80e
   script:
     - cargo version
     - cargo clippy
@@ -13,7 +13,7 @@
   stage: build
   needs: []
   image:
-    name: registry.gitlab.com/hawk777/oc-wasm-ci-images/rust:ed2bd0679f7012ed3684a2787f053e2d230b16c9
+    name: registry.gitlab.com/hawk777/oc-wasm-ci-images/rust:6b6902e3b5880ae33b65ed516e410dc3e846f80e
   script:
     - cargo version
     - make
