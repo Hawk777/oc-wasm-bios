@@ -203,7 +203,7 @@ enum RunResult {
 	/// The next step should be taken immediately.
 	RunNext,
 
-	/// The [`run`](run) function should return (most likely to allow an indirect method call to
+	/// The [`run`] function should return (most likely to allow an indirect method call to
 	/// complete).
 	Return,
 }
