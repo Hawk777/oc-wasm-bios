@@ -34,6 +34,7 @@ use oc_wasm_safe::{
 	component, computer, descriptor, descriptor::AsDescriptor, error, execute, Address,
 };
 use oc_wasm_sys::component as component_sys;
+use sync_unsafe_cell::SyncUnsafeCell;
 
 /// The panic handler used for the BIOS.
 #[panic_handler]
@@ -304,13 +305,13 @@ const BOOTABLE_COMPONENT_TYPE: &str = "filesystem";
 /// Runs one step of the state machine.
 fn run_step(state: State) -> error::Result<(RunResult, State)> {
 	// Hold a Lister.
-	static mut LISTER: Option<component::Lister> = None;
+	static LISTER: SyncUnsafeCell<Option<component::Lister>> = SyncUnsafeCell::new(None);
 	// SAFETY: Wasm is single-threaded, so only one thread will be here touching LISTER at a time.
 	// This is the only place in which LISTER is touched, so the same thread also cannot make a
 	// second mutable reference.
-	let lister = unsafe {
-		LISTER.get_or_insert_with(|| component::Lister::take().unwrap_or_else(|| internal_error()))
-	};
+	let lister = unsafe { &mut *LISTER.get() };
+	let lister =
+		lister.get_or_insert_with(|| component::Lister::take().unwrap_or_else(|| internal_error()));
 
 	// Dispatch based on current state.
 	match state {
@@ -546,20 +547,20 @@ fn run_step(state: State) -> error::Result<(RunResult, State)> {
 /// The application entry point.
 #[no_mangle]
 pub extern "C" fn run(_: i32) -> i32 {
-	static mut STATE: State = State::Init;
+	// Hold a State.
+	static STATE: SyncUnsafeCell<State> = SyncUnsafeCell::new(State::Init);
+	// SAFETY: Wasm is single-threaded, so only one thread will be here touching STATE at a time.
+	// This is the only place in which STATE is touched, so the same thread also cannot make a
+	// second mutable reference.
+	let state = unsafe { &mut *STATE.get() };
 
 	// Run continuously until asked to return.
 	loop {
-		// SAFETY: Wasm is single-threaded, so only one thread can be here at a time. The mutable
-		// reference to STATE lasts only for the duration of the replace() call.
-		let old_state = replace(unsafe { &mut STATE }, State::Init);
+		let old_state = replace(state, State::Init);
 		let rc: error::Result<(RunResult, State)> = run_step(old_state);
 		match rc {
 			Ok((result, next_state)) => {
-				// SAFETY: Wasm is single-threaded, so only one thread can be here at a time. The
-				// only reference to STATE exists a few lines above in the replace() call, and is
-				// long dead by now.
-				unsafe { STATE = next_state };
+				*state = next_state;
 				match result {
 					RunResult::RunNext => (),
 					RunResult::Return => return 0,

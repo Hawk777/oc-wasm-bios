@@ -19,6 +19,9 @@ default-features = false
 features = []
 version = "^0.12"
 
+[dependencies.sync-unsafe-cell]
+version = "^0.1"
+
 [profile.dev]
 panic = "abort"
 
